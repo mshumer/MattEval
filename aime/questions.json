@@ -1,0 +1,42 @@
+[
+  {
+  "question": "Every morning Aya goes for a 9-kilometer-long walk and stops at a coffee shop afterwards. When she walks at a constant speed of s kilometers per hour, the walk takes her 4 hours, including t minutes spent in the coffee shop. When she walks s + 2 kilometers per hour, the walk takes her 2 hours and 24 minutes, including t minutes spent in the coffee shop. Suppose Aya walks at s + 1/2 kilometers per hour. Find the number of minutes the walk takes her, including the t minutes spent in the coffee shop.",
+  "answer": "204"
+  },
+  {
+  "question": "There exist real numbers x and y, both greater than 1, such that log_x(y^x) = log_y(x^4y) = 10. Find xy.",
+  "answer": "25"
+  },
+  {
+  "question": "Alice and Bob play the following game. A stack of n tokens lies before them. The players take turns with Alice going first. On each turn, the player removes either 1 token or 4 tokens from the stack. Whoever removes the last token wins. Find the number of positive integers n less than or equal to 2024 for which there exists a strategy for Bob that guarantees that Bob will win the game regardless of Alice's play.",
+  "answer": "809"
+  },
+  {
+  "question": "Jen enters a lottery by picking 4 distinct numbers from S = {1, 2, 3, ..., 9, 10}. 4 numbers are randomly chosen from S. She wins a prize if at least two of her numbers were 2 of the randomly chosen numbers, and wins the grand prize if all four of her numbers were the randomly chosen numbers. The probability of her winning the grand prize given that she won a prize is m/n where m and n are relatively prime positive integers. Find m + n.",
+  "answer": "116"
+  },
+  {
+  "question": "Find the largest possible real part of\n    (75 + 117i)z + (96 + 144i)/z\n    where z is a complex number with |z| = 4.",
+  "answer": "540"
+  },
+  {
+    "question": "Let A, B, C, and D be points on the hyperbola x²/20 - y²/24 = 1 such that ABCD is a rhombus whose diagonals intersect at the origin. Find the greatest real number that is less than BD² for all such rhombi.",
+    "answer": "480"
+  },
+  {
+    "question": "Each vertex of a regular octagon is independently colored either red or blue with equal probability. The probability that the octagon can then be rotated so that all of the blue vertices end up at positions where there were originally red vertices is m/n, where m and n are relatively prime positive integers. What is m + n?",
+    "answer": "371"
+  },
+  {
+    "question": "Let p be the least prime number for which there exists a positive integer n such that n⁴ + 1 is divisible by p². Find the least positive integer m such that m⁴ + 1 is divisible by p².",
+    "answer": "110"
+  },
+  {
+    "question": "Let ABCD be a tetrahedron such that AB = CD = √41, AC = BD = √80, and BC = AD = √89. There exists a point I inside the tetrahedron such that the distances from I to each of the faces of the tetrahedron are all equal. This distance can be written in the form (m√n)/p, where m, n, and p are positive integers, m and p are relatively prime, and n is not divisible by the square of any prime. Find m + n + p.",
+    "answer": "104"
+  },
+  {
+    "question": "Let B be the set of rectangular boxes with surface area 54 and volume 23. Let r be the radius of the smallest sphere that can contain each of the rectangular boxes that are elements of B. The value of r² can be written as p/q, where p and q are relatively prime positive integers. Find p + q.",
+    "answer": "721"
+  }
+]
