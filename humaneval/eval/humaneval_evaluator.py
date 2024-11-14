@@ -98,8 +98,9 @@ def evaluate_humaneval(
 
     # Prepare a list to hold results
     results = []
-
-    # Use ThreadPoolExecutor to process examples in parallel
+    total_processed = 0
+    total_passed = 0
+    
     with ThreadPoolExecutor(max_workers=n_workers) as executor:
         futures = []
         for task_id, problem in selected_problems.items():
@@ -108,14 +109,25 @@ def evaluate_humaneval(
                                      prompt, problem, generate_fn)
             futures.append(future)
 
-        # Collect results
-        for future in tqdm(as_completed(futures),
-                           total=len(futures),
-                           desc="Processing HumanEval examples"):
+        pbar = tqdm(as_completed(futures),
+                   total=len(futures),
+                   desc="Processing HumanEval examples")
+                   
+        for future in pbar:
             result = future.result()
             results.append(result)
+            
+            # Update counters and progress bar
+            total_processed += 1
+            if result.get('passed', False):
+                total_passed += 1
+            
+            current_pass_rate = (total_passed / total_processed) if total_processed > 0 else 0
+            pbar.set_description(
+                f"Processing HumanEval examples | Current Pass Rate: {current_pass_rate:.2%}"
+            )
 
-    # Compute pass@k
+    # Compute final pass@k
     pass_at_k = compute_pass_at_k(results)
 
     return pass_at_k['pass@1'], results

@@ -9,58 +9,79 @@ import platform
 import signal
 import tempfile
 
-def run_test_code(code: str) -> tuple[bool, str]:
-    """Separate function to run the code to avoid pickling issues"""
-    try:
-        globals_dict = {}
-        exec(code, globals_dict)
-        return True, "Success"
-    except Exception as e:
-        return False, f"Error: {str(e)}"
 
-def unsafe_execute(code: str, timeout: float = 3.0) -> tuple[bool, str]:
-    """Executes code in a safe manner using timeout"""
-    try:
-        with tempfile.NamedTemporaryFile(suffix='.py') as f:
-            f.write(code.encode())
-            f.flush()
-            
-            manager = multiprocessing.Manager()
-            return_dict = manager.dict()
-            
-            p = multiprocessing.Process(target=run_test_code, args=(code,))
-            p.start()
-            p.join(timeout)
-            
-            if p.is_alive():
-                p.terminate()
-                return False, "Timeout"
-            
-            return_value = return_dict.get('result', None)
-            if return_value is not None:
-                return return_value
-            
-            # If we got here, assume the code ran successfully
-            return True, "Success"
-            
-    except Exception as e:
-        return False, f"Execution error: {str(e)}"
+def unsafe_execute(problem, completion, timeout, result, create_tempdir, reliability_guard, swallow_io, time_limit):
+    """Executes the code in a safe environment."""
+    with create_tempdir():
+        # These system calls are needed when cleaning up tempdir.
+        import os
+        import shutil
+        rmtree = shutil.rmtree
+        rmdir = os.rmdir
+        chdir = os.chdir
 
-def check_correctness(problem: Dict, completion: str, timeout: float = 3.0) -> Dict:
+        # Disable functionalities that can make destructive changes to the test.
+        reliability_guard()
+
+        # Construct the check program and run it.
+        check_program = (problem["prompt"] + completion + "\n" +
+                         problem["test"] + "\n" +
+                         f"check({problem['entry_point']})")
+
+        try:
+            exec_globals = {}
+            with swallow_io():
+                with time_limit(timeout):
+                    exec(check_program, exec_globals)
+            result.append("passed")
+        except TimeoutException:
+            result.append("timed out")
+        except BaseException as e:
+            result.append(f"failed: {e}")
+
+        # Needed for cleaning up.
+        shutil.rmtree = rmtree
+        os.rmdir = rmdir
+        os.chdir = chdir
+
+
+def check_correctness(problem: Dict,
+                      completion: str,
+                      timeout: float,
+                      completion_id: Optional[int] = None) -> Dict:
     """
-    Evaluates the functional correctness of a completion by running the test suite.
+    Evaluates the functional correctness of a completion by running the test
+    suite provided in the problem. 
+
+    :param completion_id: an optional completion ID so we can match
+        the results later even if execution finishes asynchronously.
     """
-    try:
-        # Combine the completion with the test code
-        test_code = completion + "\n\n" + problem["test"]
-        success, message = unsafe_execute(test_code, timeout)
-        
-        if success:
-            return {"passed": True, "result": "All tests passed"}
-        else:
-            return {"passed": False, "result": message}
-    except Exception as e:
-        return {"passed": False, "result": f"Error: {str(e)}"}
+    manager = multiprocessing.Manager()
+    result = manager.list()
+
+    p = multiprocessing.Process(
+        target=unsafe_execute,
+        args=(problem, completion, timeout, result, create_tempdir, 
+              reliability_guard, swallow_io, time_limit)
+    )
+    p.start()
+    p.join(timeout=timeout + 1)
+    if p.is_alive():
+        p.kill()
+
+    if not result:
+        result.append("timed out")
+
+    return dict(
+        task_id=problem["task_id"],
+        prompt=problem["prompt"],
+        test=problem["test"],
+        entry_point=problem["entry_point"],
+        passed=result[0] == "passed",
+        result=result[0],
+        completion_id=completion_id,
+    )
+
 
 @contextlib.contextmanager
 def time_limit(seconds: float):
@@ -75,6 +96,7 @@ def time_limit(seconds: float):
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)
 
+
 @contextlib.contextmanager
 def swallow_io():
     stream = WriteOnlyStringIO()
@@ -83,14 +105,17 @@ def swallow_io():
             with redirect_stdin(stream):
                 yield
 
+
 @contextlib.contextmanager
 def create_tempdir():
     with tempfile.TemporaryDirectory() as dirname:
         with chdir(dirname):
             yield dirname
 
+
 class TimeoutException(Exception):
     pass
+
 
 class WriteOnlyStringIO(io.StringIO):
     """ StringIO that throws an exception when it's read from """
@@ -108,8 +133,10 @@ class WriteOnlyStringIO(io.StringIO):
         """ Returns True if the IO object can be read. """
         return False
 
+
 class redirect_stdin(contextlib._RedirectStream):  # type: ignore
     _stream = 'stdin'
+
 
 @contextlib.contextmanager
 def chdir(root):
@@ -124,6 +151,7 @@ def chdir(root):
         raise exc
     finally:
         os.chdir(cwd)
+
 
 def reliability_guard(maximum_memory_bytes: Optional[int] = None):
     """
