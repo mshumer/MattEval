@@ -6,9 +6,13 @@ An extremely simple, batteries-included benchmarking system for evaluating LLM p
 
 - HumanEval
 - GPQA  
-- MATH
+- MATH (requires an OpenAI API key for correctness evaluation)
 - Dharma
 - AIME (2024 test subset - 10 questions that don't require vision capabilities)
+
+## Prompt Modifiers
+
+- Some benchmarks require outputs to follow a specific format (i.e. MATH wants a boxed answer). Given we are now in the era of systems, rather than pure models, and prompting strategies vary, you can adjust how we ask for the format by adjusting the prompt modifiers in `main.py`.
 
 ## Extensibility
 
