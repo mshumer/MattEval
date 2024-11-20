@@ -1,8 +1,8 @@
 # MattEval
 
-An extremely simple benchmarking system for evaluating LLM performance. Define your model call as a Python function, import it in `main.py`, select a benchmark, and run the evaluation.
+An extremely simple, batteries-included benchmarking system for evaluating LLM performance. Define your model call as a Python function, import it in `main.py`, select a benchmark, and run the evaluation.
 
-## Supported Benchmarks
+## Included Benchmarks
 
 - HumanEval
 - GPQA  
