@@ -9,6 +9,10 @@ from tqdm.auto import tqdm
 import pandas as pd
 import requests
 import json
+import openai
+import os
+
+client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 
 def load_dharma_subset(subset_name):
@@ -198,8 +202,12 @@ def process_example(example: Dict, generate_fn: Callable) -> Dict:
 
     try:
         generated_answer = generate_fn(input_text)
-        extracted_answer = extract_answer(generated_answer, subject)
-        correct = (extracted_answer.strip() == target.strip())
+        if subject == 'MATH':
+            extracted_answer = extract_boxed_answer(generated_answer)
+            correct = check_math_equivalence(extracted_answer, target)
+        else:
+            extracted_answer = extract_answer(generated_answer, subject)
+            correct = (extracted_answer.strip() == target.strip())
 
         return {
             'subject': subject,
@@ -241,13 +249,96 @@ class ScoreTracker:
         return self.correct / self.total
 
 
+def load_math_questions(subset_name, seed=42):
+    """Load math questions according to the subset and return a list of examples."""
+    # Set seed for reproducibility 
+    random.seed(seed)
+
+    # Read CSV file
+    math_df = pd.read_csv("math/math_test.csv")
+    math_dict = math_df.to_dict('records')
+
+    # Determine number of questions based on subset
+    if subset_name == 'micro':
+        num_questions = 20
+    elif subset_name == 'mini':
+        num_questions = 90
+    elif subset_name == 'full':
+        num_questions = len(math_dict)
+    else:
+        raise ValueError(f"Invalid subset name '{subset_name}'.")
+
+    # Shuffle and select questions
+    random.shuffle(math_dict)
+    math_dict = math_dict[:num_questions]
+
+    # Format examples
+    math_examples = []
+    for item in math_dict:
+        example = {
+            'input': item['Question'],
+            'target': str(item['Answer']),
+            'subject': 'MATH'
+        }
+        math_examples.append(example)
+
+    return math_examples
+
+def extract_boxed_answer(generated_text):
+    """Extract answer from \boxed{} format."""
+    pattern = r'\\boxed{([^}]*)}'
+    matches = re.findall(pattern, generated_text)
+    if matches:
+        return matches[-1].strip()
+    return generated_text.strip()
+
+def check_math_equivalence(generated, target):
+    """Use GPT-4-mini to check if answers are equivalent."""
+    SYSTEM_PROMPT = """Check if the the validated answer and generated answer are mathematically equivalent. If they are, return 'yes'. If they are not, return 'no'.
+    
+When evaluating mathematical responses, follow these rules for determining equivalence:
+
+Equivalent Representations:
+- Treat the following formats as equivalent:
+  * Different fraction notations (e.g., \frac{x}{y}, \dfrac{x}{y}, x/y)
+  * Different parentheses types (e.g., \left(, ()
+  * Decimal equivalents (e.g., 0.5, 1/2, .5)
+  * Different orderings of polynomial factors (e.g., 4(x+1)(x-1) = 4(x-1)(x+1))
+  * With or without multiplication symbols (e.g., 5x = 5*x)
+  * Expressions with multiple variables in alphabetical order
+  * Polynomials in decreasing degree order
+  * With or without units specified
+  * Etc.
+
+Scoring Rules:
+- Answers must be mathematically equivalent to be correct (even if they're not in the same format)
+
+Mark as 'yes' only if the validated answer and generated answer are mathematically equivalent."""
+    
+    USER_PROMPT = f"Generated answer: {generated}\n\nValidated answer: {target}\n\nIs the generated answer mathematically equivalent to the validated answer? Return 'yes' or 'no'."
+
+    # Hit the OpenAI API
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": USER_PROMPT}],
+        temperature=0,
+        max_tokens=1,
+        logit_bias={
+            "6763": 100, # "yes"
+            "1750": 100 # "no"
+        }
+    )
+
+    return response.choices[0].message.content.strip().lower() == "yes"
+
 def evaluate_model(
     generate_fn: Callable,
     subset_name: str = 'full',
     max_workers: int = 4,
-    benchmarks: List[str] = ['gpqa', 'dharma', 'humaneval', 'aime'],
+    benchmarks: List[str] = ['gpqa', 'dharma', 'humaneval', 'aime', 'math'],
     multiple_choice_prompt_modifier='Answer:',
-    humaneval_prompt_modifier="Read the following function signature and docstring, and fully implement the function described in a ```python markdown block.\n"
+    humaneval_prompt_modifier="Read the following function signature and docstring, and fully implement the function described in a ```python markdown block.\n",
+    math_prompt_modifier="Solve this math problem step by step, then provide your final answer in \\boxed{} format.\n"
 ):
     """
     Evaluate the model on specified benchmarks using parallel processing with live scoring updates.
@@ -285,13 +376,24 @@ def evaluate_model(
         aime_examples = load_aime_questions()
         examples.extend(aime_examples)
 
+    # Load math examples if specified
+    if 'math' in benchmarks:
+        print("Loading math examples...")
+        math_examples = load_math_questions(subset_name, seed=42)
+        examples.extend(math_examples)
+
     # Process GPQA and Dharma examples if any
     # Process GPQA and Dharma examples if any
     results = []
     if examples:
         for example in examples:
-            example['input'] = example['input'].replace(
-                'Answer:', multiple_choice_prompt_modifier)
+            if example['subject'] == 'MATH':
+                example['input'] = example['input'] + math_prompt_modifier
+            elif example['subject'] == 'AIME':
+                example['input'] = example['input']
+            else:
+                example['input'] = example['input'].replace(
+                    'Answer:', multiple_choice_prompt_modifier)
 
         print("Processing GPQA, AIME, and/or Dharma examples...")
         score_tracker = ScoreTracker()
