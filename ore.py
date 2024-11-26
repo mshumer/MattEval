@@ -4,20 +4,28 @@ For testing OpenReasoningEngine. Adjust the settings in the payload as necessary
 
 import requests
 import json
+import os
 
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-def generate(prompt, temperature=0.7, top_p=1.0):
+if OPENROUTER_API_KEY is None:
+    raise ValueError("OPENROUTER_API_KEY is not set")
+
+def generate(prompt, config):
   url = "http://localhost:5050/reason"
 
   payload = json.dumps({
       "task": prompt,
-      "api_key": "[redacted]", # add your OpenRouter API key here
-      "model": "gpt-4o-mini",
+      "api_key": OPENROUTER_API_KEY,
+      "model": config['model'],
       "api_url": "https://openrouter.ai/api/v1/chat/completions",
-      "max_tokens": 3000,
-      "temperature": temperature,
-      "verbose": True, # Allows you to audit the ORE system behavior
-      "max_reasoning_steps": 100,
+      "max_tokens": config['max_tokens'],
+      "temperature": config['temperature'],
+      "verbose": config['verbose'],
+      "max_reasoning_steps": config['max_reasoning_steps'],
+      "use_jeremy_planning": config['use_jeremy_planning'],
+      "use_planning": config['use_planning'],
+      "reflection_mode": config['reflection_mode'],
   })
   headers = {'Content-Type': 'application/json'}
 
@@ -25,7 +33,7 @@ def generate(prompt, temperature=0.7, top_p=1.0):
 
   # Try up to 3x, as the ORE still sometimes errors out
   try:
-    response_data = response.json()['response']
+    response_data = response.json()['response']['content']
     if response_data is None:
       raise ValueError("Response is None")
     return response_data
@@ -33,14 +41,14 @@ def generate(prompt, temperature=0.7, top_p=1.0):
     try:
       print('Response not found, trying again.')
       response = requests.request("POST", url, headers=headers, data=payload)
-      response_data = response.json()['response']
+      response_data = response.json()['response']['content']
       if response_data is None:
         raise ValueError("Response is None")
       return response_data
     except:
       print('Response not found, trying again x2.')
       response = requests.request("POST", url, headers=headers, data=payload)
-      response_data = response.json()['response']
+      response_data = response.json()['response']['content']
       if response_data is None:
         raise ValueError("Response is None") 
       return response_data

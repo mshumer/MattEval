@@ -1,18 +1,23 @@
 import requests
 import json
+import os
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-def generate(prompt, temperature=0.7, top_p=1.0):
+if OPENROUTER_API_KEY is None:
+    raise ValueError("OPENROUTER_API_KEY is not set")
+
+def generate(prompt, config):
   url = "https://openrouter.ai/api/v1/chat/completions"
 
   payload = {
-    "model": "openai/gpt-4o-mini",
+    "model": config['model'],
     "messages": [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": prompt}],
-    "temperature": temperature,
-    "top_p": top_p,
-    "max_tokens": 4096
+    "temperature": config['temperature'],
+    "top_p": config['top_p'],
+    "max_tokens": config['max_tokens']
   }
 
-  headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer [redacted]'} # Place your OpenRouter API key here
+  headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {OPENROUTER_API_KEY}'}
 
   response = requests.request("POST", url, headers=headers, json=payload)
   
